@@ -1,0 +1,15 @@
+# .htaccess – LEHNA (compatible XAMPP Windows)
+
+# Désactive le listage des répertoires
+Options -Indexes
+
+# Protection des fichiers sensibles
+<FilesMatch "\.(sql|md|log)$">
+    Require all denied
+</FilesMatch>
+
+# Bloquer l'accès direct au dossier includes
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^includes/ - [F,L]
+</IfModule>

@@ -1,0 +1,12 @@
+# assets/images/uploads/.htaccess
+# Sécurité du dossier d'upload :
+# Interdit l'exécution de scripts PHP ou autre dans ce dossier
+
+<FilesMatch "\.(php|php3|php4|php5|phtml|pl|py|jsp|asp|aspx|cgi|sh)$">
+    Require all denied
+</FilesMatch>
+
+# N'autoriser que les images
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|svg)$">
+    Require all granted
+</FilesMatch>
