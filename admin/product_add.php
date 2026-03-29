@@ -32,10 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($values['code_barre'] === '')     $errors[] = 'Le code-barres est obligatoire.';
         if (!is_numeric($values['quantite']) || $values['quantite'] < 0) $errors[] = 'Quantité invalide.';
 
-        // Unicité du code-barres
-        if ($values['code_barre'] !== '' && getProduitByCodeBarre($values['code_barre'])) {
-            $errors[] = 'Ce code-barres est déjà utilisé.';
-        }
+        // Vérifier si le produit existe déjà en base
+        $produitExistant = ($values['code_barre'] !== '')
+            ? getProduitByCodeBarre($values['code_barre'])
+            : null;
 
         // Upload image
         $imageFilename = 'default.jpg';
@@ -57,22 +57,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if (empty($errors)) {
-            $pdo  = getPDO();
-            $stmt = $pdo->prepare('
-                INSERT INTO produits (nom, prix, code_barre, quantite, image, categorie, description)
-                VALUES (:nom, :prix, :code_barre, :quantite, :image, :categorie, :description)
-            ');
-            $stmt->execute([
-                ':nom'         => $values['nom'],
-                ':prix'        => (float) $values['prix'],
-                ':code_barre'  => $values['code_barre'],
-                ':quantite'    => (int)   $values['quantite'],
-                ':image'       => $imageFilename,
-                ':categorie'   => $values['categorie'],
-                ':description' => $values['description'],
-            ]);
+            $pdo = getPDO();
 
-            setFlash('success', 'Produit « ' . $values['nom'] . ' » ajouté avec succès !');
+            if ($produitExistant) {
+                // ✅ Produit déjà en base → on additionne la quantité au stock existant
+                $stmt = $pdo->prepare('
+                    UPDATE produits
+                    SET quantite = quantite + :quantite
+                    WHERE id = :id
+                ');
+                $stmt->execute([
+                    ':quantite' => (int) $values['quantite'],
+                    ':id'       => $produitExistant['id'],
+                ]);
+
+                setFlash('success', 'Stock mis à jour : +' . $values['quantite'] . ' unité(s) pour « ' . $produitExistant['nom'] . ' ».');
+            } else {
+                // ✅ Nouveau produit → INSERT classique
+                $stmt = $pdo->prepare('
+                    INSERT INTO produits (nom, prix, code_barre, quantite, image, categorie, description)
+                    VALUES (:nom, :prix, :code_barre, :quantite, :image, :categorie, :description)
+                ');
+                $stmt->execute([
+                    ':nom'         => $values['nom'],
+                    ':prix'        => (float) $values['prix'],
+                    ':code_barre'  => $values['code_barre'],
+                    ':quantite'    => (int)   $values['quantite'],
+                    ':image'       => $imageFilename,
+                    ':categorie'   => $values['categorie'],
+                    ':description' => $values['description'],
+                ]);
+
+                setFlash('success', 'Produit « ' . $values['nom'] . ' » ajouté avec succès !');
+            }
+
             redirect(APP_URL . '/admin/products.php');
         }
     }

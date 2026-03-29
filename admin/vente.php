@@ -421,7 +421,10 @@ document.getElementById('montantRecu').addEventListener('input', updateMonnaie);
 
 // ── Recherche produit texte ───────────────────────────
 let searchTimeout;
+let usbScanInProgress = false; // vrai pendant un scan USB → bloque le debounce
+
 document.getElementById('posSearch').addEventListener('input', function () {
+    if (usbScanInProgress) return; // scanner USB en cours → ignorer l'événement input
     clearTimeout(searchTimeout);
     const q = this.value.trim();
     if (q.length < 2) return;
@@ -490,6 +493,94 @@ function showSearchResults(produits) {
     document.addEventListener('click', () => dropdown.remove(), { once: true });
 }
 
+// ════════════════════════════════════════════════════════════════════════
+// SCANNER USB HID (caisse POS) — HENEX et compatibles
+// Écoute les frappes rapides sur #posSearch (ou document sans focus)
+// et court-circuite le debounce de recherche normale.
+// ════════════════════════════════════════════════════════════════════════
+(function () {
+    const USB_SPEED = 50;  // ms max entre deux touches → mode scanner USB
+
+    let usbBuf  = '';   // buffer des caractères accumulés
+    let usbTime = 0;    // timestamp de la dernière touche
+
+    const posSearchEl = document.getElementById('posSearch');
+
+    document.addEventListener('keydown', function (e) {
+        // ── Ne pas intercepter un autre champ de saisie ──────────────────
+        const active = document.activeElement;
+        const isOtherInput = active &&
+            ['INPUT', 'TEXTAREA', 'SELECT'].includes(active.tagName) &&
+            active !== posSearchEl;
+        if (isOtherInput) return;
+
+        const now     = Date.now();
+        const elapsed = now - usbTime;
+
+        // ── Touche Entrée : valider le scan USB ──────────────────────────
+        if (e.key === 'Enter') {
+            if (usbBuf.length >= 4) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const code = usbBuf;
+                usbBuf  = '';
+                usbTime = 0;
+                usbScanInProgress = false;
+
+                console.log('%c🔌 MODE SCANNER USB (caisse) — code : ' + code,
+                    'color:#4ade80; font-weight:bold');
+
+                // Arrêter la caméra si elle tourne
+                if (posScanning) stopPosScanner();
+
+                // Annuler tout debounce de recherche en attente
+                clearTimeout(searchTimeout);
+                posSearchEl.value = '';
+
+                // Rechercher et ajouter au panier immédiatement
+                fetch(`ajax/pos_search.php?q=${encodeURIComponent(code)}&csrf_token=${CSRF}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.produits.length > 0) {
+                            playBeep();
+                            addProductToCart(data.produits[0]);
+                        } else {
+                            showNotif('❌ Produit non trouvé : ' + code, 'error');
+                        }
+                    })
+                    .catch(function () {
+                        showNotif('❌ Erreur réseau', 'error');
+                    });
+            }
+            usbBuf  = '';
+            usbTime = 0;
+            usbScanInProgress = false;
+            return;
+        }
+
+        // ── Caractère imprimable ─────────────────────────────────────────
+        if (e.key.length === 1) {
+            if (usbBuf.length === 0 || elapsed < USB_SPEED) {
+                usbBuf += e.key;
+
+                // Dès le 2e caractère rapide : bloquer l'événement input
+                // et masquer la frappe dans le champ (le buffer sera injecté à la fin)
+                if (usbBuf.length > 1) {
+                    e.preventDefault();
+                    usbScanInProgress = true;
+                    clearTimeout(searchTimeout);
+                }
+            } else {
+                // Frappe lente → saisie humaine normale
+                usbBuf            = e.key;
+                usbScanInProgress = false;
+            }
+            usbTime = now;
+        }
+    });
+})();
+
 // ── Scanner caméra POS ───────────────────────────────
 let posScanning = false;
 
@@ -501,6 +592,8 @@ document.getElementById('posScanBtn').addEventListener('click', () => {
 document.getElementById('posStopScan').addEventListener('click', stopPosScanner);
 
 function startPosScanner() {
+    console.log('%c📷 MODE CAMÉRA (caisse) — démarrage Quagga',
+        'color:#60a5fa; font-weight:bold');
     document.getElementById('posScannerContainer').classList.remove('hidden');
     document.getElementById('posScanStatus').textContent = '⏳ Démarrage…';
     document.getElementById('posScanBtn').textContent = '⏹';
