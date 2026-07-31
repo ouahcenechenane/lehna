@@ -61,7 +61,6 @@ lehna/
 ├── index.php                  ← Boutique publique
 ├── database.sql               ← Script SQL complet
 ├── ventes_tables.sql          ← Tables des ventes
-├── reset_password.php
 ├── admin/
 │   ├── index.php              ← Dashboard
 │   ├── login.php
@@ -144,23 +143,16 @@ define('APP_URL',   'http://localhost/lehna');
 chmod 775 /path/to/lehna/assets/images/uploads/
 ```
 
-### 7. Accéder au site
+### 7. Créer votre propre compte admin
+
+Le script `database.sql` insère un compte admin de démonstration. **Changez immédiatement son mot de passe** après l'installation, via un script local générant un hash avec `password_hash()`, avant toute mise en ligne.
+
+### 8. Accéder au site
 
 | Page | URL |
 |---|---|
 | Boutique publique | http://localhost/lehna |
 | Administration | http://localhost/lehna/admin/ |
-
----
-
-## 🔐 Connexion administrateur
-
-| Champ | Valeur |
-|---|---|
-| Identifiant | `admin` |
-| Mot de passe | `Admin@1234` |
-
-> ⚠️ **Changez ce mot de passe en production !**
 
 ---
 
@@ -174,6 +166,7 @@ chmod 775 /path/to/lehna/assets/images/uploads/
 - ✅ Headers HTTP de sécurité (X-Frame-Options, etc.)
 - ✅ Soft-delete (produits désactivés, pas supprimés)
 - ✅ Dossier uploads protégé contre l'exécution de scripts
+- ✅ Les identifiants de démonstration ne sont jamais exposés publiquement
 
 ---
 
@@ -184,7 +177,7 @@ chmod 775 /path/to/lehna/assets/images/uploads/
 | Erreur de connexion BDD | Vérifiez que MySQL est démarré + `config.php` |
 | Caméra ne s'ouvre pas | Utilisez `localhost` ou HTTPS, autorisez la caméra |
 | Upload d'image échoue | Vérifiez permissions `uploads/` et `upload_max_filesize` dans `php.ini` |
-| Page blanche / 500 | Activez `DEBUG_MODE = true` dans `config.php` |
+| Page blanche / 500 | Activez temporairement `DEBUG_MODE = true` dans `config.php` |
 
 ---
 
